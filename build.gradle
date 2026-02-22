@@ -1,0 +1,65 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.5.10'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'net.javaguides'
+version = '0.0.1-SNAPSHOT'
+description = 'Demo project for Spring Boot'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-log4j2'
+
+	// BOM (Bill of Materials) para asegurar que todas las librerías de AWS sean compatibles entre sí
+	implementation(platform("software.amazon.awssdk:bom:2.27.0"))
+	// Librerías específicas que necesitarás para DynamoDB
+	implementation("software.amazon.awssdk:dynamodb")
+	implementation("software.amazon.awssdk:dynamodb-enhanced")
+
+	// AWS X-Ray (Versión optimizada para Spring Boot 3 y Java 21)
+	implementation("com.amazonaws:aws-xray-recorder-sdk-core:2.18.2")
+	implementation("com.amazonaws:aws-xray-recorder-sdk-spring:2.18.2")
+	implementation("com.amazonaws:aws-xray-recorder-sdk-aws-sdk-v2:2.18.2")
+	implementation("com.amazonaws:aws-xray-recorder-sdk-log4j:2.18.2") // Para tus logs con Log4j2
+
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
+
+configurations {
+	configureEach {
+		exclude group: 'org.springframework.boot', module: 'spring-boot-starter-logging'
+		exclude group: 'commons-logging', module: 'commons-logging'
+	}
+}
+
+tasks.register("unpack", Copy) {
+	dependsOn bootJar
+	from(zipTree(tasks.bootJar.outputs.files.singleFile))
+	into("build/libs")
+}
