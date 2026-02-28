@@ -2,7 +2,10 @@ package net.javaguides.productsservice.products.repositories;
 
 import com.amazonaws.xray.spring.aop.XRayEnabled;
 import java.util.concurrent.CompletableFuture;
+import net.javaguides.productsservice.products.controllers.ProductsController;
 import net.javaguides.productsservice.products.model.Product;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
@@ -50,6 +53,7 @@ import software.amazon.awssdk.enhanced.dynamodb.model.UpdateItemEnhancedRequest;
 @Repository
 @XRayEnabled
 public class ProductsRepository {
+    private static final Logger LOG = LogManager.getLogger(ProductsRepository.class);
 
     /** Condition to prevent accidental upserts — fails if the item does not already exist. */
     private static final Expression EXISTS_CONDITION =
@@ -90,6 +94,7 @@ public class ProductsRepository {
      * @return a {@link CompletableFuture} that completes with the retrieved {@link Product} if found, or completes with {@code null} if no matching item exists
      */
     public CompletableFuture<Product> getById(final String productId) {
+        LOG.info("🔍 - Retrieving product with ID: {}", productId);
         return productsTable.getItem(this.keyOf(productId));
     }
 
