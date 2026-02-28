@@ -7,6 +7,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletionException;
 import lombok.RequiredArgsConstructor;
 import net.javaguides.productsservice.products.dto.ProductDto;
+import net.javaguides.productsservice.products.enums.ProductErrors;
+import net.javaguides.productsservice.products.exceptions.ProductException;
 import net.javaguides.productsservice.products.model.Product;
 import net.javaguides.productsservice.products.repositories.ProductsRepository;
 import org.apache.logging.log4j.LogManager;
@@ -48,7 +50,7 @@ public class ProductsController {
     }
 
     @GetMapping("{id}")
-    public ResponseEntity<?> getProductById(@PathVariable("id") final String id) {
+    public ResponseEntity<ProductDto> getProductById(@PathVariable("id") final String id) throws  ProductException {
         LOG.info("ℹ️ - GET /api/products/{} called", id);
 
         Product product = productsRepository.getById(id).join();
@@ -56,9 +58,7 @@ public class ProductsController {
             LOG.info("✅ - Product found: {}", product);
             return new ResponseEntity<>(new ProductDto(product), HttpStatus.OK);
         } else {
-            final String message = String.format("⚠️ - Product with id %s not found", id);
-            LOG.warn(message, id);
-            return new ResponseEntity<>(message, HttpStatus.NOT_FOUND);
+            throw new ProductException(ProductErrors.PRODUCT_NOT_FOUND, id);
         }
     }
 
@@ -75,7 +75,7 @@ public class ProductsController {
     }
 
     @DeleteMapping("{id}")
-    public ResponseEntity<?> deleteProduct(@PathVariable("id") final String id) {
+    public ResponseEntity<ProductDto> deleteProduct(@PathVariable("id") final String id) throws ProductException {
         LOG.info("ℹ️ - DELETE /api/products/{} called", id);
 
         Product productDeleted = productsRepository.deleteById(id).join();
@@ -83,14 +83,13 @@ public class ProductsController {
             LOG.info("✅ - Product with id {} deleted successfully", id);
             return new ResponseEntity<>(new ProductDto(productDeleted), HttpStatus.OK);
         } else {
-            final String message = String.format("⚠️ - Product with id %s not found for deletion", id);
-            LOG.warn(message);
-            return new ResponseEntity<>(message, HttpStatus.NOT_FOUND);
+            throw new ProductException(ProductErrors.PRODUCT_NOT_FOUND, id);
         }
     }
 
     @PutMapping("{id}")
-    public ResponseEntity<?> updateProduct(@PathVariable("id") final String id, @RequestBody final ProductDto productDto) {
+    public ResponseEntity<ProductDto> updateProduct(@PathVariable("id") final String id,
+                                                    @RequestBody final ProductDto productDto) throws ProductException {
         LOG.info("ℹ️ - PUT /api/products/{} called with payload: {}", id, productDto);
 
         try {
@@ -99,9 +98,7 @@ public class ProductsController {
             LOG.info("✅ - Product with id {} updated successfully", id);
             return new ResponseEntity<>(new ProductDto(updatedProduct), HttpStatus.OK);
         } catch (CompletionException e) {
-            String message = String.format("⚠️ - Product with id %s not found for update", id);
-            LOG.warn(message);
-            return new ResponseEntity<>(message, HttpStatus.NOT_FOUND);
+            throw new ProductException(ProductErrors.PRODUCT_NOT_FOUND, id);
         }
     }
 }
