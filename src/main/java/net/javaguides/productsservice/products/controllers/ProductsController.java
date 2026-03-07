@@ -1,6 +1,7 @@
 package net.javaguides.productsservice.products.controllers;
 
 import com.amazonaws.xray.spring.aop.XRayEnabled;
+import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -63,7 +64,7 @@ public class ProductsController {
     }
 
     @PostMapping
-    public ResponseEntity<ProductDto> createProduct(@RequestBody final ProductDto productDto) {
+    public ResponseEntity<ProductDto> createProduct(@Valid @RequestBody final ProductDto productDto) {
         LOG.info("ℹ️ - POST /api/products called with payload: {}", productDto);
 
         Product product = ProductDto.toProduct(productDto);
@@ -89,7 +90,7 @@ public class ProductsController {
 
     @PutMapping("{id}")
     public ResponseEntity<ProductDto> updateProduct(@PathVariable("id") final String id,
-                                                    @RequestBody final ProductDto productDto) throws ProductException {
+                                                    @Valid @RequestBody final ProductDto productDto) throws ProductException {
         LOG.info("ℹ️ - PUT /api/products/{} called with payload: {}", id, productDto);
 
         try {
