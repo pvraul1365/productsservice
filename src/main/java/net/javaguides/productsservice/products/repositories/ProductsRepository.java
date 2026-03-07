@@ -1,8 +1,12 @@
 package net.javaguides.productsservice.products.repositories;
 
 import com.amazonaws.xray.spring.aop.XRayEnabled;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import net.javaguides.productsservice.products.controllers.ProductsController;
+import net.javaguides.productsservice.products.enums.ProductErrors;
+import net.javaguides.productsservice.products.exceptions.ProductException;
 import net.javaguides.productsservice.products.model.Product;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -11,6 +15,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 import software.amazon.awssdk.enhanced.dynamodb.*;
 import software.amazon.awssdk.enhanced.dynamodb.model.PagePublisher;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.enhanced.dynamodb.model.UpdateItemEnhancedRequest;
 
 /**
@@ -72,13 +78,39 @@ public class ProductsRepository {
         this.productsTable = dynamoDbEnhancedAsyncClient.table(productsDdbName, TableSchema.fromBean(Product.class));
     }
 
+    private CompletableFuture<Product> checkIfCodeExists(final String code) {
+        List<Product> products = new ArrayList<>();
+        this.productsTable.index("codeIdx").query(QueryEnhancedRequest.builder()
+                        .limit(1)
+                        .queryConditional(QueryConditional.keyEqualTo(Key.builder()
+                                        .partitionValue(code)
+                                .build()))
+                .build())
+                .subscribe(productPage -> {
+                    products.addAll(productPage.items());
+                }
+        ).join();
+        if (products.isEmpty()) {
+            return CompletableFuture.supplyAsync(() -> null);
+        } else {
+            return CompletableFuture.supplyAsync(() -> products.get(0));
+        }
+    }
+
+    public CompletableFuture<Product> getByCode(final String code) {
+        LOG.info("🔍 - Retrieving product with code: {}", code);
+        Product productByCode = checkIfCodeExists(code).join();
+        if (productByCode != null) {
+            LOG.info("✅ - Product found with code {}: {}", code, productByCode);
+            return this.getById(productByCode.getId());
+        } else {
+            LOG.info("⚠️ - No product found with code: {}", code);
+            return CompletableFuture.supplyAsync(() -> null);
+        }
+    }
+
     /**
      * Retrieves all products from the DynamoDB table using a scan operation.
-     *
-     * <p><b>Warning:</b> This method performs a full table scan, which can be expensive and slow,
-     * especially for large datasets. It is intended for demonstration purposes only. In production
-     * environments, consider using query operations with appropriate indexes and pagination to
-     * efficiently retrieve subsets of data.</p>
      *
      * @return a {@link PagePublisher<Product>} that emits pages of products as they are retrieved from the table
      */
@@ -105,7 +137,13 @@ public class ProductsRepository {
      * @return a {@link CompletableFuture} that completes with the created {@link Product} when the operation succeeds
      * @throws NullPointerException if {@code product} is {@code null}
      */
-    public CompletableFuture<Product> create(Product product) {
+    public CompletableFuture<Product> create(Product product) throws ProductException {
+        Product productWithSameCode = checkIfCodeExists(product.getCode()).join();
+        if (productWithSameCode != null) {
+            LOG.warn("⚠️ - Attempt to create product with duplicate code '{}': existing product found: {}", product.getCode(), productWithSameCode);
+            throw new ProductException(ProductErrors.PRODUCT_CODE_ALREADY_EXISTS, productWithSameCode.getId());
+        }
+
         return productsTable.putItem(product)
                 .thenApply(ignored -> product);
     }
@@ -126,10 +164,6 @@ public class ProductsRepository {
 
     /**
      * Updates an existing {@code Product} in the data store using the provided product ID.
-     * <p>
-     * This method enforces that the target item already exists by applying a conditional
-     * expression ({@code attribute_exists(id)}). If no existing item matches the given ID,
-     * the update fails with a conditional check error (propagated via the returned future).
      *
      * @param product the product data to persist; its ID is overwritten with {@code productId}
      * @param productId the identifier of the product to update
@@ -137,8 +171,14 @@ public class ProductsRepository {
      *         {@code Product} when the operation succeeds, or completes exceptionally if the
      *         update fails (for example, when the item does not exist)
      */
-    public CompletableFuture<Product> update(Product product, final String productId) {
+    public CompletableFuture<Product> update(Product product, final String productId) throws ProductException {
         product.setId(productId);
+
+        Product productWithSameCode = checkIfCodeExists(product.getCode()).join();
+        if (productWithSameCode != null && !productWithSameCode.getId().equals(product.getId())) {
+            throw new ProductException(ProductErrors.PRODUCT_CODE_ALREADY_EXISTS, productWithSameCode.getId());
+        }
+
         return productsTable.updateItem(
                 UpdateItemEnhancedRequest.<Product>builder(Product.class)
                         .item(product)

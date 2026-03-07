@@ -38,16 +38,29 @@ public class ProductsController {
     private final ProductsRepository productsRepository;
 
     @GetMapping
-    public ResponseEntity<List<ProductDto>> getProducts() {
-        LOG.info("ℹ️ - GET /api/products called");
+    public ResponseEntity<?> getProducts(
+            @RequestParam(value = "code", required = false) final String code) throws ProductException {
 
-        List<ProductDto> productsDto = new ArrayList<>();
+        if (code != null) {
+            LOG.info("ℹ️ - GET /api/products called with code filter: {}", code);
+            Product productByCode = productsRepository.getByCode(code).join();
 
-        productsRepository.getAll().items().subscribe(product -> {
-            productsDto.add(new ProductDto(product));
-        }).join();
+            if (productByCode == null) {
+                throw new ProductException(ProductErrors.PRODUCT_NOT_FOUND, null);
+            } else {
+                return new ResponseEntity<>(new ProductDto(productByCode), HttpStatus.OK);
+            }
 
-        return new ResponseEntity<>(productsDto, HttpStatus.OK);
+        } else {
+            LOG.info("ℹ️ - GET /api/products called");
+            List<ProductDto> productsDto = new ArrayList<>();
+
+            productsRepository.getAll().items().subscribe(product -> {
+                productsDto.add(new ProductDto(product));
+            }).join();
+
+            return new ResponseEntity<>(productsDto, HttpStatus.OK);
+        }
     }
 
     @GetMapping("{id}")
@@ -64,7 +77,8 @@ public class ProductsController {
     }
 
     @PostMapping
-    public ResponseEntity<ProductDto> createProduct(@Valid @RequestBody final ProductDto productDto) {
+    public ResponseEntity<ProductDto> createProduct(@Valid @RequestBody final ProductDto productDto)
+            throws ProductException {
         LOG.info("ℹ️ - POST /api/products called with payload: {}", productDto);
 
         Product product = ProductDto.toProduct(productDto);
@@ -92,7 +106,6 @@ public class ProductsController {
     public ResponseEntity<ProductDto> updateProduct(@PathVariable("id") final String id,
                                                     @Valid @RequestBody final ProductDto productDto) throws ProductException {
         LOG.info("ℹ️ - PUT /api/products/{} called with payload: {}", id, productDto);
-
         try {
             Product updatedProduct = productsRepository.update(ProductDto.toProduct(productDto), id).join();
 

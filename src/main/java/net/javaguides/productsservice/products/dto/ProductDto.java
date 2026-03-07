@@ -10,11 +10,11 @@ public record ProductDto(
         String id,
 
         @NotBlank(message = "Product name cannot be blank")
-        @Size(min = 5, max = 50, message = "Product name must be between 5 and 50 characters")
+        @Size(min = 3, max = 50, message = "Product name must be between 5 and 50 characters")
         String name,
 
         @NotBlank(message = "Product code cannot be blank")
-        @Size(min = 5, max = 15, message = "Product code must be between 5 and 50 characters")
+        @Size(min = 3, max = 15, message = "Product code must be between 5 and 50 characters")
         String code,
 
         @Positive(message = "Product price must be greater than zero")
