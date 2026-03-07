@@ -35,3 +35,4 @@ out/
 
 ### VS Code ###
 .vscode/
+docker/dynamodb/shared-local-instance.db
