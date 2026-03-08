@@ -35,6 +35,7 @@ dependencies {
 	// Librerías específicas que necesitarás para DynamoDB
 	implementation("software.amazon.awssdk:dynamodb")
 	implementation("software.amazon.awssdk:dynamodb-enhanced")
+	implementation("software.amazon.awssdk:sns")
 
 	// AWS X-Ray (Versión optimizada para Spring Boot 3 y Java 21)
 	implementation("com.amazonaws:aws-xray-recorder-sdk-core:2.18.2")
