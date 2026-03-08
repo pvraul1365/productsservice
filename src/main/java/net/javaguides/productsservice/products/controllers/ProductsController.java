@@ -1,12 +1,16 @@
 package net.javaguides.productsservice.products.controllers;
 
 import com.amazonaws.xray.spring.aop.XRayEnabled;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import lombok.RequiredArgsConstructor;
+import net.javaguides.productsservice.events.dto.EventType;
 import net.javaguides.productsservice.events.services.EventsPublisher;
 import net.javaguides.productsservice.products.dto.ProductDto;
 import net.javaguides.productsservice.products.enums.ProductErrors;
@@ -15,9 +19,11 @@ import net.javaguides.productsservice.products.model.Product;
 import net.javaguides.productsservice.products.repositories.ProductsRepository;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.ThreadContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import software.amazon.awssdk.services.sns.model.PublishResponse;
 
 /**
  * ProductsController
@@ -80,23 +86,35 @@ public class ProductsController {
 
     @PostMapping
     public ResponseEntity<ProductDto> createProduct(@Valid @RequestBody final ProductDto productDto)
-            throws ProductException {
+            throws ProductException, JsonProcessingException, ExecutionException, InterruptedException {
         LOG.info("ℹ️ - POST /api/products called with payload: {}", productDto);
 
-        Product product = ProductDto.toProduct(productDto);
-        product.setId(UUID.randomUUID().toString());
-        Product createdProduct = productsRepository.create(product).join();
+        Product productCreated = ProductDto.toProduct(productDto);
+        productCreated.setId(UUID.randomUUID().toString());
+        CompletableFuture<Product> productCompletableFuture = productsRepository.create(productCreated);
 
-        LOG.info("✅ - Product created with ID: {}", createdProduct.getId());
-        return new ResponseEntity<>(new ProductDto(createdProduct), HttpStatus.CREATED);
+        CompletableFuture<PublishResponse> publishResponseCompletableFuture =
+                eventsPublisher.sendProductEvent(productCreated, EventType.PRODUCT_CREATED,
+                                "raul.perez.vicente@gmail.com");
+
+        CompletableFuture.allOf(productCompletableFuture, publishResponseCompletableFuture).join();
+        PublishResponse publishResponse = publishResponseCompletableFuture.get();
+        ThreadContext.put("messageId", publishResponse.messageId());
+
+        LOG.info("✅ - Product created with ID: {}", productCreated.getId());
+        return new ResponseEntity<>(new ProductDto(productCreated), HttpStatus.CREATED);
     }
 
     @DeleteMapping("{id}")
-    public ResponseEntity<ProductDto> deleteProduct(@PathVariable("id") final String id) throws ProductException {
+    public ResponseEntity<ProductDto> deleteProduct(@PathVariable("id") final String id)
+            throws ProductException, JsonProcessingException {
         LOG.info("ℹ️ - DELETE /api/products/{} called", id);
-
         Product productDeleted = productsRepository.deleteById(id).join();
         if (productDeleted != null) {
+            PublishResponse publishResponse = eventsPublisher.sendProductEvent(productDeleted, EventType.PRODUCT_DELETED, "raul.perez.vicente@gmail.com")
+                    .join();
+            ThreadContext.put("messageId", publishResponse.messageId());
+
             LOG.info("✅ - Product with id {} deleted successfully", id);
             return new ResponseEntity<>(new ProductDto(productDeleted), HttpStatus.OK);
         } else {
@@ -106,10 +124,16 @@ public class ProductsController {
 
     @PutMapping("{id}")
     public ResponseEntity<ProductDto> updateProduct(@PathVariable("id") final String id,
-                                                    @Valid @RequestBody final ProductDto productDto) throws ProductException {
+                                                    @Valid @RequestBody final ProductDto productDto)
+            throws ProductException, JsonProcessingException {
         LOG.info("ℹ️ - PUT /api/products/{} called with payload: {}", id, productDto);
         try {
             Product updatedProduct = productsRepository.update(ProductDto.toProduct(productDto), id).join();
+
+            PublishResponse publishResponse = eventsPublisher.sendProductEvent(updatedProduct, EventType.PRODUCT_UPDATED,
+                            "raul.perez.vicente@gmail.com")
+                    .join();
+            ThreadContext.put("messageId", publishResponse.messageId());
 
             LOG.info("✅ - Product with id {} updated successfully", id);
             return new ResponseEntity<>(new ProductDto(updatedProduct), HttpStatus.OK);
