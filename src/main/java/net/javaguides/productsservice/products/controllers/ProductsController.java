@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
 import lombok.RequiredArgsConstructor;
+import net.javaguides.productsservice.events.services.EventsPublisher;
 import net.javaguides.productsservice.products.dto.ProductDto;
 import net.javaguides.productsservice.products.enums.ProductErrors;
 import net.javaguides.productsservice.products.exceptions.ProductException;
@@ -36,6 +37,7 @@ public class ProductsController {
     private static final Logger LOG = LogManager.getLogger(ProductsController.class);
 
     private final ProductsRepository productsRepository;
+    private final EventsPublisher eventsPublisher;
 
     @GetMapping
     public ResponseEntity<?> getProducts(

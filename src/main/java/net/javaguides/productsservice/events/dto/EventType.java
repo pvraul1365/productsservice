@@ -1,6 +1,6 @@
 package net.javaguides.productsservice.events.dto;
 
-public enum EventTyoe {
+public enum EventType {
     PRODUCT_CREATED,
     PRODUCT_UPDATED,
     PRODUCT_DELETED
