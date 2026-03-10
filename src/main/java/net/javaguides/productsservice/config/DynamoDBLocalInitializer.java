@@ -5,10 +5,10 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 import software.amazon.awssdk.services.dynamodb.model.*;
 
-import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -21,10 +21,11 @@ import java.util.concurrent.ExecutionException;
  * @version 07/03/2026
  * @since 1.17
  */
+@Profile("local")
 @Configuration
-public class DynamoDbLocalInitializer {
+public class DynamoDBLocalInitializer {
 
-    private static final Logger log = LogManager.getLogger(DynamoDbLocalInitializer.class);
+    private static final Logger log = LogManager.getLogger(DynamoDBLocalInitializer.class);
 
     private final DynamoDbAsyncClient dynamoDbAsyncClient;
 
@@ -34,7 +35,7 @@ public class DynamoDbLocalInitializer {
     @Value("${aws.productsddb.name}")
     private String tableName;
 
-    public DynamoDbLocalInitializer(DynamoDbAsyncClient dynamoDbAsyncClient) {
+    public DynamoDBLocalInitializer(DynamoDbAsyncClient dynamoDbAsyncClient) {
         this.dynamoDbAsyncClient = dynamoDbAsyncClient;
     }
 

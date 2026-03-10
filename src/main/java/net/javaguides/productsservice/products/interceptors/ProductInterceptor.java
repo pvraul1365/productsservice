@@ -24,6 +24,13 @@ public class ProductInterceptor implements HandlerInterceptor {
                              HttpServletResponse response,
                              Object handler) throws Exception {
 
+        // 1. Obtener el valor y verificar si es nulo o está vacío
+        String requestId = ThreadContext.get("requestId");
+
+        if (requestId == null || requestId.trim().isEmpty()) {
+            requestId = "no-request-id"; // Valor por defecto
+        }
+
         ThreadContext.put("requestId", request.getHeader("requestId"));
 
         return true; // Devuelve true para continuar con la cadena de manejo

@@ -30,6 +30,12 @@ public class ProductsExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleProductException(ProductException productException, WebRequest request) {
         LOG.error("❌ - ProductException occurred: {}", productException.getProductErrors().getMessage());
 
+        // 1. Obtener el valor y verificar si es nulo o está vacío
+        String requestId = ThreadContext.get("requestId");
+
+        if (requestId == null || requestId.trim().isEmpty()) {
+            requestId = "no-request-id"; // Valor por defecto
+        }
         ProductErrorResponse productErrorResponse = new ProductErrorResponse(
                 productException.getProductErrors().getMessage(),
                 productException.getProductErrors().getHttpStatus().value(),
