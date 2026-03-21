@@ -4,7 +4,6 @@ import com.amazonaws.xray.AWSXRay;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import net.javaguides.productsservice.events.dto.EventType;
@@ -12,7 +11,6 @@ import net.javaguides.productsservice.events.dto.ProductEventDto;
 import net.javaguides.productsservice.events.dto.ProductFailureEventDto;
 import net.javaguides.productsservice.products.model.Product;
 import org.apache.logging.log4j.ThreadContext;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -20,7 +18,6 @@ import software.amazon.awssdk.services.sns.SnsAsyncClient;
 import software.amazon.awssdk.services.sns.model.MessageAttributeValue;
 import software.amazon.awssdk.services.sns.model.PublishRequest;
 import software.amazon.awssdk.services.sns.model.PublishResponse;
-import software.amazon.awssdk.services.sns.model.Topic;
 
 /**
  * EventsPublisher
@@ -31,21 +28,34 @@ import software.amazon.awssdk.services.sns.model.Topic;
  * @version 08/03/2026 - 10:51
  * @since 1.17
  */
-@Profile("!local")
+@Profile("local")
 @Service
-public class EventsPublisher implements IEventsPublisher {
+public class LocalEventsPublisher implements IEventsPublisher {
 
     private final SnsAsyncClient snsAsyncClient;
-    private final Topic productEventsTopic;
+    private String topicArn; // Almacenamos el ARN completo aquí
     private final ObjectMapper objectMapper;
 
     // Usamos @Value directamente en el parámetro del constructor
-    public EventsPublisher(SnsAsyncClient snsAsyncClient,
-                           ObjectMapper objectMapper,
-                           @Qualifier("productEventsTopic") Topic productEventsTopic) {
+    public LocalEventsPublisher(SnsAsyncClient snsAsyncClient,
+                                ObjectMapper objectMapper,
+                                @Value("${aws.sns.topic.name:product-events}") String topicName) {
         this.snsAsyncClient = snsAsyncClient;
         this.objectMapper = objectMapper;
-        this.productEventsTopic = productEventsTopic;
+
+        // Recuperamos el ARN dinámicamente al arrancar
+        try {
+            // .join() es necesario porque es un cliente Async y estamos en el constructor
+            this.topicArn = snsAsyncClient.createTopic(t -> t.name(topicName))
+                    .thenApply(r -> r.topicArn())
+                    .join();
+
+            System.out.println(">>> [EventsPublisher] Conectado al tópico: " + this.topicArn);
+        } catch (Exception e) {
+            // Si falla (por ejemplo, LocalStack no responde), usamos el formato estándar
+            this.topicArn = "arn:aws:sns:us-east-1:000000000000:" + topicName;
+            System.err.println(">>> [EventsPublisher] Error recuperando ARN, usando fallback: " + this.topicArn);
+        }
     }
 
     @Override
@@ -72,13 +82,13 @@ public class EventsPublisher implements IEventsPublisher {
         String rawRequestId = ThreadContext.get("requestId");
         String safeRequestId = (rawRequestId != null && !rawRequestId.isBlank())
                 ? rawRequestId
-                : "local-dev-" + java.util.UUID.randomUUID();
+                : "local-dev-" + UUID.randomUUID();
 
         // 2. Hacemos lo mismo para el traceId por si X-Ray no está activo
         String safeTraceId = "no-trace";
         try {
-            if (com.amazonaws.xray.AWSXRay.getCurrentSegment() != null) {
-                safeTraceId = com.amazonaws.xray.AWSXRay.getCurrentSegment().getTraceId().toString();
+            if (AWSXRay.getCurrentSegment() != null) {
+                safeTraceId = AWSXRay.getCurrentSegment().getTraceId().toString();
             }
         } catch (Exception e) {
             // En local esto fallará a menudo, así que mantenemos el "no-trace"
@@ -100,7 +110,7 @@ public class EventsPublisher implements IEventsPublisher {
                                 .stringValue(safeTraceId)   // <--- USAR EL VALOR SEGURO
                                 .build()
                 ))
-                .topicArn(this.productEventsTopic.topicArn())
+                .topicArn(this.topicArn)
                 .build());
     }
 

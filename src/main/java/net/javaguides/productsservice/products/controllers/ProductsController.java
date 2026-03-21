@@ -11,7 +11,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import lombok.RequiredArgsConstructor;
 import net.javaguides.productsservice.events.dto.EventType;
-import net.javaguides.productsservice.events.services.EventsPublisher;
+import net.javaguides.productsservice.events.services.IEventsPublisher;
 import net.javaguides.productsservice.products.dto.ProductDto;
 import net.javaguides.productsservice.products.enums.ProductErrors;
 import net.javaguides.productsservice.products.exceptions.ProductException;
@@ -43,7 +43,7 @@ public class ProductsController {
     private static final Logger LOG = LogManager.getLogger(ProductsController.class);
 
     private final ProductsRepository productsRepository;
-    private final EventsPublisher eventsPublisher;
+    private final IEventsPublisher eventsPublisher;
 
     @GetMapping
     public ResponseEntity<?> getProducts(
